@@ -3,7 +3,7 @@ import * as store from './storage.js';
 import * as calc from './calc.js';
 import * as api from './api.js';
 import * as scanner from './scanner.js';
-import { COMMON_FOODS, searchLocal } from './db.js';
+import { searchLocal, FOODS } from './db.js';
 import * as stats from './stats.js';
 
 /* ─────────────────────────── Zustand ─────────────────────────── */
@@ -274,7 +274,7 @@ function renderProfile() {
       <button class="btn ghost" data-act="import">⬆️ Daten importieren</button>
       <button class="btn danger ghost" data-act="reset">🗑️ Alles zurücksetzen</button>
     </div>
-    <p class="fineprint">Version 1.1 · Lebensmitteldaten von <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener">Open Food Facts</a> (ODbL). Keine medizinische Beratung.</p>
+    <p class="fineprint">Version 1.2 · Lebensmitteldaten von <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener">Open Food Facts</a> (ODbL). Keine medizinische Beratung.</p>
   `;
 }
 
@@ -881,11 +881,11 @@ function drawWeekChart(s) {
 
 /* ─────────────────────────── Essen hinzufügen (Modal) ─────────────────────────── */
 
-let addContext = { meal: 'breakfast', tab: 'search' };
+let addContext = { meal: 'breakfast', tab: 'offline' };
 let searchTimer = null;
 
 function openAddSheet(meal) {
-  addContext = { meal: meal || mealByTime(), tab: 'search' };
+  addContext = { meal: meal || mealByTime(), tab: 'offline' };
   const root = document.getElementById('modal-root');
   root.innerHTML = `
     <div class="overlay" data-act="close-modal-bg">
@@ -897,15 +897,16 @@ function openAddSheet(meal) {
           <button class="icon-btn" data-act="close-modal" aria-label="Schließen">✕</button>
         </div>
         <div class="tabs">
-          <button class="t-tab active" data-act="add-tab" data-tab="search">🔎 Suche</button>
+          <button class="t-tab active" data-act="add-tab" data-tab="offline">🔎 Offline</button>
           <button class="t-tab" data-act="add-tab" data-tab="scan">📷 Scan</button>
           <button class="t-tab" data-act="add-tab" data-tab="manual">✏️ Manuell</button>
+          <button class="t-tab" data-act="add-tab" data-tab="online">🌐 Online</button>
         </div>
         <div class="sheet-body" id="sheet-body"></div>
       </div>
     </div>`;
   document.getElementById('add-meal').addEventListener('change', (e) => (addContext.meal = e.target.value));
-  renderAddTab('search');
+  renderAddTab('offline');
 }
 
 function closeModal() {
@@ -924,43 +925,76 @@ function renderAddTab(tab) {
     scanController = null;
   }
   const body = document.getElementById('sheet-body');
-  if (tab === 'search') body.innerHTML = renderSearchTab();
+  if (tab === 'offline') body.innerHTML = renderOfflineTab();
   else if (tab === 'scan') body.innerHTML = renderScanTab();
-  else body.innerHTML = renderManualTab();
+  else if (tab === 'manual') body.innerHTML = renderManualTab();
+  else body.innerHTML = renderOnlineTab();
 
-  if (tab === 'search') {
+  if (tab === 'offline') {
+    const inp = document.getElementById('offline-input');
+    inp.addEventListener('input', onOfflineSearch);
+    inp.focus();
+    renderOfflineQuickPicks();
+  } else if (tab === 'online') {
     const inp = document.getElementById('search-input');
     inp.addEventListener('input', onSearchInput);
     inp.focus();
-    renderQuickPicks();
   }
 }
 
-function renderSearchTab() {
+function renderOfflineTab() {
   return `
     <div class="search-bar">
-      <input id="search-input" type="search" placeholder="Lebensmittel suchen … z. B. Haferflocken" autocomplete="off">
-      <div id="search-status" class="hint"></div>
+      <input id="offline-input" type="search" placeholder="Offline suchen … z. B. Schinken, Käsekuchen, Joghurt" autocomplete="off">
+      <div class="hint">📴 Über ${fmt(FOODS.length)} Lebensmittel offline — ohne Internet, sofort.</div>
     </div>
-    <div id="search-results"></div>
-    <div id="quick-picks"></div>
+    <div id="offline-results"></div>
+    <div id="offline-picks"></div>
   `;
 }
 
-function renderQuickPicks() {
-  const wrap = document.getElementById('quick-picks');
+function renderOnlineTab() {
+  return `
+    <div class="search-bar">
+      <input id="search-input" type="search" placeholder="Online suchen (Open Food Facts) … Marke oder Produkt" autocomplete="off">
+      <div id="search-status" class="hint"></div>
+    </div>
+    <div id="search-results"></div>
+  `;
+}
+
+function renderOfflineQuickPicks() {
+  const wrap = document.getElementById('offline-picks');
   if (!wrap) return;
-  const recent = state.recent.slice(0, 8);
-  const customs = state.customFoods.slice(0, 8);
+  const recent = state.recent.slice(0, 10);
+  const customs = state.customFoods.slice(0, 10);
   const groups = [];
   if (recent.length)
     groups.push(`<h4 class="pick-title">Zuletzt verwendet</h4><div class="chips">${recent.map((f, i) => chip(f, 'recent', i)).join('')}</div>`);
   if (customs.length)
     groups.push(`<h4 class="pick-title">Eigene Lebensmittel</h4><div class="chips">${customs.map((f, i) => chip(f, 'custom', i)).join('')}</div>`);
-  groups.push(
-    `<h4 class="pick-title">Häufige Lebensmittel</h4><div class="chips">${COMMON_FOODS.slice(0, 18).map((f, i) => chip({ ...f, source: 'local' }, 'common', i)).join('')}</div>`
-  );
+  if (!groups.length)
+    groups.push(
+      `<div class="hint">Tippe oben, um aus über ${fmt(FOODS.length)} Lebensmitteln zu wählen — von Schinken über Käsekuchen bis Linsensuppe. 🍽️</div>`
+    );
   wrap.innerHTML = groups.join('');
+}
+
+function onOfflineSearch(e) {
+  const q = e.target.value.trim();
+  const results = document.getElementById('offline-results');
+  const picks = document.getElementById('offline-picks');
+  if (q.length < 2) {
+    results.innerHTML = '';
+    if (picks) picks.style.display = '';
+    return;
+  }
+  if (picks) picks.style.display = 'none';
+  const found = searchLocal(q);
+  lastResults = found;
+  results.innerHTML = found.length
+    ? resultList(found)
+    : `<div class="hint">Keine Treffer in der Offline-Liste für „${esc(q)}“. Versuch die Onlinesuche 🌐 oder „Manuell“. ✏️</div>`;
 }
 
 function chip(food, kind, i) {
@@ -973,11 +1007,12 @@ let searchAbort = null;
 const searchCache = new Map(); // Suchbegriff (klein) → Online-Treffer; spart wiederholte Anfragen
 const SEARCH_DEBOUNCE = 600; // ms warten, bis getippt fertig ist (schont das API-Rate-Limit)
 
-function renderMerged(results, status, local, remote, q) {
-  const merged = [...local, ...remote];
-  lastResults = merged;
-  results.innerHTML = resultList(merged);
-  status.textContent = merged.length ? '' : `Keine Treffer für „${esc(q)}“ gefunden — versuch’s mit „Manuell“. ✏️`;
+function showOnline(results, status, remote, q) {
+  lastResults = remote;
+  results.innerHTML = remote.length
+    ? resultList(remote)
+    : `<div class="hint">Keine Online-Treffer für „${esc(q)}“ — nutze die Offline-Suche 🔎 oder „Manuell“. ✏️</div>`;
+  status.textContent = '';
 }
 
 function onSearchInput(e) {
@@ -985,28 +1020,19 @@ function onSearchInput(e) {
   clearTimeout(searchTimer);
   const status = document.getElementById('search-status');
   const results = document.getElementById('search-results');
-  const picks = document.getElementById('quick-picks');
   if (q.length < 2) {
     results.innerHTML = '';
     status.textContent = '';
-    if (picks) picks.style.display = '';
     return;
   }
-  if (picks) picks.style.display = 'none';
-  // Sofort lokale Treffer zeigen (ohne Wartezeit, ohne Netzwerk).
-  const local = searchLocal(q);
-  lastResults = local;
-  results.innerHTML = resultList(local);
-
   // Bereits gesuchte Begriffe aus dem Cache bedienen — keine neue Anfrage.
   const key = q.toLowerCase();
   if (searchCache.has(key)) {
-    renderMerged(results, status, local, searchCache.get(key), q);
+    showOnline(results, status, searchCache.get(key), q);
     return;
   }
 
-  // Status bewusst noch leer lassen — "Suche…" erscheint erst beim echten Senden,
-  // nicht bei jedem einzelnen Tastendruck.
+  // "Suche…" erscheint erst beim echten Senden, nicht bei jedem Tastendruck.
   status.textContent = '';
   const seq = ++searchSeq;
   searchTimer = setTimeout(async () => {
@@ -1024,18 +1050,15 @@ function onSearchInput(e) {
     if (err) {
       if (err.name === 'AbortError') return; // bewusst abgebrochen — keine Meldung
       if (err.status === 429 || (err.status >= 500 && err.status < 600)) {
-        // Rate-Limit oder überlasteter Server → später erneut, nicht sofort nachfeuern.
-        status.textContent = '⏳ Die Lebensmittel-Datenbank ist gerade überlastet — versuch’s in ein paar Sekunden erneut. Lokale Treffer & „Manuell“ stehen bereit.';
+        status.textContent = '⏳ Die Online-Datenbank ist gerade überlastet — versuch’s in ein paar Sekunden erneut oder nutze die Offline-Suche 🔎.';
       } else {
-        status.textContent = local.length
-          ? '⚠️ Online-Suche gerade nicht erreichbar — lokale Treffer werden angezeigt.'
-          : '⚠️ Online-Suche gerade nicht erreichbar. Versuch’s gleich erneut oder nutze „Manuell“. ✏️';
+        status.textContent = '⚠️ Online-Suche nicht erreichbar. Nutze die Offline-Suche 🔎 oder „Manuell“. ✏️';
       }
       return;
     }
     searchCache.set(key, remote);
     if (searchCache.size > 60) searchCache.delete(searchCache.keys().next().value);
-    renderMerged(results, status, local, remote, q);
+    showOnline(results, status, remote, q);
   }, SEARCH_DEBOUNCE);
 }
 
@@ -1421,7 +1444,6 @@ function setupGlobalEvents() {
         let food;
         if (kind === 'recent') food = state.recent[i];
         else if (kind === 'custom') food = state.customFoods[i];
-        else food = { ...COMMON_FOODS[i], source: 'local' };
         if (food) openPortion(food);
         break;
       }

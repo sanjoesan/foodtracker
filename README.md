@@ -12,8 +12,9 @@ Läuft komplett im Browser — **keine Anmeldung, kein Server, kein Tracking.** 
 - **Gesunde Grenzen** 💚 — das Abnehm-/Zunehmtempo ist auf gesunde Werte gedeckelt (max. ~1 % Körpergewicht bzw. 1 kg/Woche), Kalorien fallen nie unter sichere Mindestwerte (1200/1500 kcal), plus BMI-Warnungen.
 - **Realistische Zeitspanne** ⏱️ — ehrliche Prognose, wann du dein Ziel erreichst.
 - **Food-Tracking** — Frühstück, Mittag, Abendessen & Snacks, Menge in **Gramm/ml oder Stück**.
+- **Offlinesuche** 🔎 — eingebaute Datenbank mit **über 1.170 recherchierten Lebensmitteln** (Obst, Gemüse, Brot, Fleisch, Wurst & Schinken, Fisch, Käse, Joghurt, Kuchen & Torten, Desserts, Suppen, Vorspeisen, Hauptgerichte, Getränke u. v. m.) – sofort, ohne Internet, umlauttolerant. Standard-Tab beim Hinzufügen.
 - **Barcode-Scanner** 📷 — Kamera-Scan (native `BarcodeDetector`-API mit ZXing-Fallback) oder manuelle EAN-Eingabe.
-- **Textsuche** 🔎 — Millionen Produkte über die [Open Food Facts](https://world.openfoodfacts.org)-Datenbank. Tipp-Verzögerung (Debounce) + Ergebnis-Cache schonen das API-Limit; eingebaute Offline-Liste gängiger Lebensmittel als Fallback. Klare Meldungen: „keine Treffer" vs. „Datenbank überlastet" vs. „nicht erreichbar".
+- **Onlinesuche** 🌐 — Millionen Markenprodukte über die [Open Food Facts](https://world.openfoodfacts.org)-Datenbank. Tipp-Verzögerung (Debounce) + Ergebnis-Cache schonen das API-Limit. Klare Meldungen: „keine Treffer" vs. „überlastet" vs. „nicht erreichbar".
 - **Makro-Tracking** — Eiweiß, Kohlenhydrate, Fett mit Tageszielen.
 - **Wochenstatistiken** 📊 — Balkendiagramm der letzten 7 Tage, Ø Kalorien & Makros, „Tage im Plan", Wochen-Navigation und Gewichtsänderung der Woche.
 - **Dark Mode** 🌙 — heller/dunkler Modus, folgt standardmäßig der Systemeinstellung, per Tipp umschaltbar.
@@ -59,7 +60,8 @@ Vanilla JavaScript (ES-Module), keine Frameworks, keine Build-Pipeline. Deployme
 - `js/calc.js` — Berechnungen & Gesundheits-Guards
 - `js/api.js` — Open-Food-Facts-Anbindung
 - `js/scanner.js` — Barcode-Scan
-- `js/db.js` — Offline-Lebensmittel
+- `js/db.js` — Offline-Suche (tolerant, indexiert)
+- `js/foods-data.js` — Offline-Datenbank (~1.180 Lebensmittel, je 100 g/ml)
 - `js/stats.js` — Wochenstatistik-Aggregation
 - `js/storage.js` — lokale Speicherung
 - `js/app.js` — Steuerung & UI
@@ -68,7 +70,7 @@ Getestet mit dem Node-Test-Runner: Logik-Tests (`calc`, `stats`), API-Tests mit 
 
 ## 📓 Changelog
 
-Alle Änderungen sind in [CHANGELOG.md](CHANGELOG.md) dokumentiert. Aktuell: **v1.1.0**.
+Alle Änderungen sind in [CHANGELOG.md](CHANGELOG.md) dokumentiert. Aktuell: **v1.2.0**.
 
 ## 📄 Lizenz
 

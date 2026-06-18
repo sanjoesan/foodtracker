@@ -4,6 +4,36 @@ Alle nennenswerten Änderungen an diesem Projekt. Format orientiert sich an
 [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionierung nach
 [SemVer](https://semver.org/lang/de/).
 
+## [1.2.0] – 2026-06-18
+
+### Hinzugefügt
+
+- **Große Offline-Datenbank** 🔎 — `js/foods-data.js` mit **über 1.170 recherchierten
+  Lebensmitteln** (Nährwerte je 100 g/ml) über 21 Kategorien: Obst, Gemüse, Brot &
+  Backwaren, Getreide & Beilagen, Cerealien, Fleisch & Geflügel, Wurst & Schinken,
+  Fisch & Meeresfrüchte, Eier, Hülsenfrüchte, Fleischersatz, Milchprodukte, Käse,
+  Süßes & Desserts (Kuchen, Torten, Eis …), Snacks, Fette & Nüsse, Saucen & Dips,
+  Suppen & Eintöpfe, Vorspeisen, Hauptgerichte, Getränke. Werte recherchiert (USDA,
+  fddb.info, naehrwertrechner.de) und validiert (kcal ≈ 4·EW + 4·KH + 9·Fett,
+  Duplikate entfernt). Tolerante Suche (umlaut-/akzentunabhängig) in `js/db.js`.
+
+### Geändert
+
+- **Hinzufügen-Dialog neu sortiert**: **Offlinesuche** (mit Suchfeld über die große
+  Datenbank) ist jetzt der erste Tab und Standard, **Onlinesuche** (Open Food Facts)
+  der letzte. Dazwischen Scan und Manuell.
+- Die feste Chip-Liste „Häufige Lebensmittel" entfällt — stattdessen durchsucht man
+  die komplette Offline-Datenbank. „Zuletzt verwendet" und „Eigene Lebensmittel"
+  bleiben als Schnellauswahl im Offline-Tab.
+- Onlinesuche zeigt nur noch echte Open-Food-Facts-Treffer (keine lokalen mehr
+  beigemischt) und verweist bei Bedarf auf die Offline-Suche.
+
+### Tests
+
+- Neue `tests/db.test.js` (Größe, Pflichtfelder, keine Duplikate, Plausibilität,
+  Kategorienabdeckung, tolerante Suche). DOM-Test auf die neuen Tabs angepasst.
+  Insgesamt 53 Tests grün.
+
 ## [1.1.0] – 2026-06-18
 
 ### Hinzugefügt
@@ -60,5 +90,6 @@ Alle nennenswerten Änderungen an diesem Projekt. Format orientiert sich an
 - Daten lokal (`localStorage`), JSON-Import/-Export, PWA.
 - Vanilla JS (ES-Module, kein Build), Deployment über GitHub Pages.
 
+[1.2.0]: https://github.com/sanjoesan/foodtracker/releases/tag/v1.2.0
 [1.1.0]: https://github.com/sanjoesan/foodtracker/releases/tag/v1.1.0
 [1.0.0]: https://github.com/sanjoesan/foodtracker/releases/tag/v1.0.0
