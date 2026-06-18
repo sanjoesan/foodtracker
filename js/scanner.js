@@ -15,7 +15,7 @@ export function hasNativeDetector() {
 
 /** Prüft, ob überhaupt eine Kamera angesprochen werden kann. */
 export function hasCamera() {
-  return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+  return typeof navigator !== 'undefined' && !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
 }
 
 /**
