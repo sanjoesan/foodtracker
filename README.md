@@ -13,7 +13,7 @@ Läuft komplett im Browser — **keine Anmeldung, kein Server, kein Tracking.** 
 - **Realistische Zeitspanne** ⏱️ — ehrliche Prognose, wann du dein Ziel erreichst.
 - **Food-Tracking** — Frühstück, Mittag, Abendessen & Snacks, Menge in **Gramm/ml oder Stück**.
 - **Barcode-Scanner** 📷 — Kamera-Scan (native `BarcodeDetector`-API mit ZXing-Fallback) oder manuelle EAN-Eingabe.
-- **Textsuche** 🔎 — Millionen Produkte über die [Open Food Facts](https://world.openfoodfacts.org)-Datenbank, plus eingebaute Offline-Liste gängiger Lebensmittel.
+- **Textsuche** 🔎 — Millionen Produkte über die [Open Food Facts](https://world.openfoodfacts.org)-Datenbank. Tipp-Verzögerung (Debounce) + Ergebnis-Cache schonen das API-Limit; eingebaute Offline-Liste gängiger Lebensmittel als Fallback. Klare Meldungen: „keine Treffer" vs. „Datenbank überlastet" vs. „nicht erreichbar".
 - **Makro-Tracking** — Eiweiß, Kohlenhydrate, Fett mit Tageszielen.
 - **Wochenstatistiken** 📊 — Balkendiagramm der letzten 7 Tage, Ø Kalorien & Makros, „Tage im Plan", Wochen-Navigation und Gewichtsänderung der Woche.
 - **Dark Mode** 🌙 — heller/dunkler Modus, folgt standardmäßig der Systemeinstellung, per Tipp umschaltbar.
@@ -64,7 +64,11 @@ Vanilla JavaScript (ES-Module), keine Frameworks, keine Build-Pipeline. Deployme
 - `js/storage.js` — lokale Speicherung
 - `js/app.js` — Steuerung & UI
 
-Getestet mit dem Node-Test-Runner: Logik-Tests (`calc`, `stats`), CSS-Responsiveness-Lint und ein vollständiger DOM-Integrationstest (jsdom) — alles läuft in CI.
+Getestet mit dem Node-Test-Runner: Logik-Tests (`calc`, `stats`), API-Tests mit gemocktem `fetch` (`api`), CSS-Responsiveness-Lint und ein vollständiger DOM-Integrationstest (jsdom) — alles läuft in CI.
+
+## 📓 Changelog
+
+Alle Änderungen sind in [CHANGELOG.md](CHANGELOG.md) dokumentiert. Aktuell: **v1.1.0**.
 
 ## 📄 Lizenz
 

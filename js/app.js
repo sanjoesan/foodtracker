@@ -274,7 +274,7 @@ function renderProfile() {
       <button class="btn ghost" data-act="import">⬆️ Daten importieren</button>
       <button class="btn danger ghost" data-act="reset">🗑️ Alles zurücksetzen</button>
     </div>
-    <p class="fineprint">Version 1.0 · Lebensmitteldaten von <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener">Open Food Facts</a> (ODbL). Keine medizinische Beratung.</p>
+    <p class="fineprint">Version 1.1 · Lebensmitteldaten von <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener">Open Food Facts</a> (ODbL). Keine medizinische Beratung.</p>
   `;
 }
 
