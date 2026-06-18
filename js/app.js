@@ -969,6 +969,17 @@ function chip(food, kind, i) {
 
 let lastResults = [];
 let searchSeq = 0;
+let searchAbort = null;
+const searchCache = new Map(); // Suchbegriff (klein) → Online-Treffer; spart wiederholte Anfragen
+const SEARCH_DEBOUNCE = 600; // ms warten, bis getippt fertig ist (schont das API-Rate-Limit)
+
+function renderMerged(results, status, local, remote, q) {
+  const merged = [...local, ...remote];
+  lastResults = merged;
+  results.innerHTML = resultList(merged);
+  status.textContent = merged.length ? '' : `Keine Treffer für „${esc(q)}“ gefunden — versuch’s mit „Manuell“. ✏️`;
+}
+
 function onSearchInput(e) {
   const q = e.target.value.trim();
   clearTimeout(searchTimer);
@@ -982,33 +993,50 @@ function onSearchInput(e) {
     return;
   }
   if (picks) picks.style.display = 'none';
-  // Sofort lokale Treffer zeigen (ohne Wartezeit).
+  // Sofort lokale Treffer zeigen (ohne Wartezeit, ohne Netzwerk).
   const local = searchLocal(q);
   lastResults = local;
   results.innerHTML = resultList(local);
-  status.textContent = 'Suche bei Open Food Facts …';
+
+  // Bereits gesuchte Begriffe aus dem Cache bedienen — keine neue Anfrage.
+  const key = q.toLowerCase();
+  if (searchCache.has(key)) {
+    renderMerged(results, status, local, searchCache.get(key), q);
+    return;
+  }
+
+  // Status bewusst noch leer lassen — "Suche…" erscheint erst beim echten Senden,
+  // nicht bei jedem einzelnen Tastendruck.
+  status.textContent = '';
   const seq = ++searchSeq;
   searchTimer = setTimeout(async () => {
+    status.textContent = 'Suche bei Open Food Facts …';
+    if (searchAbort) searchAbort.abort(); // evtl. noch laufende Anfrage stoppen
+    searchAbort = new AbortController();
     let remote;
-    let failed = false;
+    let err = null;
     try {
-      remote = await api.searchFoods(q);
-    } catch (err) {
-      failed = true;
+      remote = await api.searchFoods(q, { signal: searchAbort.signal });
+    } catch (e2) {
+      err = e2;
     }
     if (seq !== searchSeq) return; // veraltete Antwort einer früheren Eingabe verwerfen
-    if (failed) {
-      // Nur bei echtem Netzwerk-/Serverfehler.
-      status.textContent = local.length
-        ? '⚠️ Online-Suche gerade nicht erreichbar — lokale Treffer werden angezeigt.'
-        : '⚠️ Online-Suche gerade nicht erreichbar. Versuch’s gleich erneut oder nutze „Manuell“. ✏️';
+    if (err) {
+      if (err.name === 'AbortError') return; // bewusst abgebrochen — keine Meldung
+      if (err.status === 429 || (err.status >= 500 && err.status < 600)) {
+        // Rate-Limit oder überlasteter Server → später erneut, nicht sofort nachfeuern.
+        status.textContent = '⏳ Die Lebensmittel-Datenbank ist gerade überlastet — versuch’s in ein paar Sekunden erneut. Lokale Treffer & „Manuell“ stehen bereit.';
+      } else {
+        status.textContent = local.length
+          ? '⚠️ Online-Suche gerade nicht erreichbar — lokale Treffer werden angezeigt.'
+          : '⚠️ Online-Suche gerade nicht erreichbar. Versuch’s gleich erneut oder nutze „Manuell“. ✏️';
+      }
       return;
     }
-    const merged = [...local, ...remote];
-    lastResults = merged;
-    results.innerHTML = resultList(merged);
-    status.textContent = merged.length ? '' : `Keine Treffer für „${esc(q)}“ gefunden — versuch’s mit „Manuell“. ✏️`;
-  }, 450);
+    searchCache.set(key, remote);
+    if (searchCache.size > 60) searchCache.delete(searchCache.keys().next().value);
+    renderMerged(results, status, local, remote, q);
+  }, SEARCH_DEBOUNCE);
 }
 
 function resultList(foods) {

@@ -63,12 +63,22 @@ export function normalize(p) {
   };
 }
 
-async function fetchJSON(url, { timeout = 12000, tolerantParse = false } = {}) {
+async function fetchJSON(url, { timeout = 12000, tolerantParse = false, signal } = {}) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeout);
+  const onAbort = () => ctrl.abort();
+  if (signal) {
+    if (signal.aborted) ctrl.abort();
+    else signal.addEventListener('abort', onAbort, { once: true });
+  }
   try {
     const res = await fetch(url, { signal: ctrl.signal, headers: { Accept: 'application/json' } });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`); // echter Serverfehler
+    if (!res.ok) {
+      // Echter Serverfehler; status 429 = Rate-Limit (zu viele Anfragen).
+      const e = new Error(`HTTP ${res.status}`);
+      e.status = res.status;
+      throw e;
+    }
     if (tolerantParse) {
       // Unverständliche Antwort → null (= "keine Treffer"), kein harter Fehler.
       try {
@@ -80,6 +90,7 @@ async function fetchJSON(url, { timeout = 12000, tolerantParse = false } = {}) {
     return await res.json();
   } finally {
     clearTimeout(t);
+    if (signal) signal.removeEventListener('abort', onAbort);
   }
 }
 
@@ -103,7 +114,7 @@ export async function lookupBarcode(barcode) {
  * Volltextsuche.
  * @returns Array normalisierter Lebensmittel (mit Nährwerten, nach Relevanz).
  */
-export async function searchFoods(query, { pageSize = 24 } = {}) {
+export async function searchFoods(query, { pageSize = 24, signal } = {}) {
   const q = query.trim();
   if (!q) return [];
   const params = new URLSearchParams({
@@ -117,7 +128,7 @@ export async function searchFoods(query, { pageSize = 24 } = {}) {
   const url = `${BASE}/cgi/search.pl?${params.toString()}`;
   // tolerantParse: leere/seltsame Antworten gelten als "keine Treffer",
   // nur echte Netzwerk-/Serverfehler werfen (→ UI: "nicht erreichbar").
-  const data = await fetchJSON(url, { timeout: 15000, tolerantParse: true });
+  const data = await fetchJSON(url, { timeout: 15000, tolerantParse: true, signal });
   const products = data && Array.isArray(data.products) ? data.products : [];
   return products
     .map(normalize)
