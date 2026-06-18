@@ -15,6 +15,8 @@ Läuft komplett im Browser — **keine Anmeldung, kein Server, kein Tracking.** 
 - **Barcode-Scanner** 📷 — Kamera-Scan (native `BarcodeDetector`-API mit ZXing-Fallback) oder manuelle EAN-Eingabe.
 - **Textsuche** 🔎 — Millionen Produkte über die [Open Food Facts](https://world.openfoodfacts.org)-Datenbank, plus eingebaute Offline-Liste gängiger Lebensmittel.
 - **Makro-Tracking** — Eiweiß, Kohlenhydrate, Fett mit Tageszielen.
+- **Wochenstatistiken** 📊 — Balkendiagramm der letzten 7 Tage, Ø Kalorien & Makros, „Tage im Plan", Wochen-Navigation und Gewichtsänderung der Woche.
+- **Dark Mode** 🌙 — heller/dunkler Modus, folgt standardmäßig der Systemeinstellung, per Tipp umschaltbar.
 - **Fortschritt** 📈 — Gewichtsverlauf-Diagramm, Fortschrittsbalken, Tages-Serie (Streak) und motivierende Nachrichten.
 - **Backup** — Daten als JSON exportieren/importieren.
 - **PWA** — installierbar, mobil-optimiert.
@@ -58,8 +60,11 @@ Vanilla JavaScript (ES-Module), keine Frameworks, keine Build-Pipeline. Deployme
 - `js/api.js` — Open-Food-Facts-Anbindung
 - `js/scanner.js` — Barcode-Scan
 - `js/db.js` — Offline-Lebensmittel
+- `js/stats.js` — Wochenstatistik-Aggregation
 - `js/storage.js` — lokale Speicherung
 - `js/app.js` — Steuerung & UI
+
+Getestet mit dem Node-Test-Runner: Logik-Tests (`calc`, `stats`), CSS-Responsiveness-Lint und ein vollständiger DOM-Integrationstest (jsdom) — alles läuft in CI.
 
 ## 📄 Lizenz
 

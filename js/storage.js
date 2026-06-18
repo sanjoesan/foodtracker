@@ -12,6 +12,7 @@ export function emptyState() {
     days: {}, // { 'YYYY-MM-DD': { breakfast:[], lunch:[], dinner:[], snack:[] } }
     customFoods: [], // eigene, wiederverwendbare Lebensmittel
     recent: [], // zuletzt genutzte Lebensmittel (Vorlagen) für Schnell-Hinzufügen
+    settings: { theme: null }, // theme: null = Systemvorgabe, sonst 'light' | 'dark'
   };
 }
 

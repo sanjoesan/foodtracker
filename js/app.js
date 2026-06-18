@@ -4,15 +4,37 @@ import * as calc from './calc.js';
 import * as api from './api.js';
 import * as scanner from './scanner.js';
 import { COMMON_FOODS, searchLocal } from './db.js';
+import * as stats from './stats.js';
 
 /* ─────────────────────────── Zustand ─────────────────────────── */
 
 let state = store.load();
-let view = 'today'; // 'today' | 'progress' | 'profile'
+let view = 'today'; // 'today' | 'week' | 'progress' | 'profile'
 let selectedDate = ymd();
+let weekOffset = 0; // 0 = aktuelle Woche (endet heute), -1 = Vorwoche …
 let scanController = null; // aktiver Kamera-Scan
 
 const persist = () => store.save(state);
+
+/* ─────────────────────────── Theme (hell/dunkel) ─────────────────────────── */
+
+function effectiveTheme() {
+  const t = state.settings && state.settings.theme;
+  if (t === 'light' || t === 'dark') return t;
+  return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+function applyTheme() {
+  document.documentElement.dataset.theme = effectiveTheme();
+}
+function toggleTheme() {
+  state.settings = state.settings || {};
+  state.settings.theme = effectiveTheme() === 'dark' ? 'light' : 'dark';
+  persist();
+  applyTheme();
+  renderTopbar();
+  if (view === 'progress') drawWeightChart();
+  if (view === 'week') drawCurrentWeek();
+}
 
 /* ─────────────────────────── Helfer ─────────────────────────── */
 
@@ -136,6 +158,9 @@ function render() {
   if (view === 'today') {
     $view().innerHTML = renderToday();
     bindToday();
+  } else if (view === 'week') {
+    $view().innerHTML = renderWeek();
+    bindWeek();
   } else if (view === 'progress') {
     $view().innerHTML = renderProgress();
     bindProgress();
@@ -146,13 +171,16 @@ function render() {
 }
 
 function renderTopbar() {
-  const name = state.profile ? '' : '';
   const streak = computeStreak();
   const hour = new Date().getHours();
   const greet = hour < 11 ? 'Guten Morgen' : hour < 18 ? 'Hallo' : 'Guten Abend';
+  const isDark = effectiveTheme() === 'dark';
   $top().innerHTML = `
     <div class="brand">🥗 <span>Foodtracker</span></div>
-    ${state.profile ? `<div class="greet">${greet}! ${streak >= 2 ? `<span class="flame" title="${streak} Tage in Folge">🔥 ${streak}</span>` : ''}</div>` : ''}
+    <div class="top-right">
+      ${state.profile ? `<span class="greet">${greet}!${streak >= 2 ? ` <span class="flame" title="${streak} Tage in Folge">🔥 ${streak}</span>` : ''}</span>` : ''}
+      <button class="theme-toggle" data-act="toggle-theme" aria-label="Helles/dunkles Design wechseln" title="Design wechseln">${isDark ? '☀️' : '🌙'}</button>
+    </div>
   `;
 }
 
@@ -165,8 +193,9 @@ function renderTabbar() {
     `<button class="tab ${view === key ? 'active' : ''}" data-act="view" data-view="${key}"><span class="ti">${icon}</span><span>${label}</span></button>`;
   $bar().innerHTML = `
     ${tab('today', '📅', 'Heute')}
-    ${tab('progress', '📈', 'Fortschritt')}
+    ${tab('week', '📊', 'Woche')}
     <button class="fab" data-act="quick-add" title="Essen hinzufügen">＋</button>
+    ${tab('progress', '📈', 'Fortschritt')}
     ${tab('profile', '⚙️', 'Profil')}
   `;
 }
@@ -548,9 +577,11 @@ function renderProgress() {
     <div class="card">
       <h3 class="section-title flush">Gewicht eintragen</h3>
       <div class="weigh-form">
-        <input id="w-date" type="date" value="${ymd()}" max="${ymd()}">
-        <input id="w-kg" type="number" step="0.1" min="35" max="300" placeholder="kg" value="${cur ?? ''}">
-        <button class="btn primary" data-act="log-weight">Speichern</button>
+        <div class="weigh-main">
+          <input id="w-kg" type="number" inputmode="decimal" step="0.1" min="35" max="300" placeholder="Gewicht in kg" value="${cur ?? ''}">
+          <button class="btn primary save-icon" data-act="log-weight" aria-label="Gewicht speichern" title="Speichern">✓</button>
+        </div>
+        <input id="w-date" type="date" value="${ymd()}" max="${ymd()}" aria-label="Datum">
       </div>
     </div>
 
@@ -604,7 +635,8 @@ function drawWeightChart() {
   const target = state.profile.targetWeightKg;
   const css = getComputedStyle(document.documentElement);
   const accent = css.getPropertyValue('--accent').trim() || '#16a34a';
-  const grid = 'rgba(0,0,0,0.08)';
+  const warm = css.getPropertyValue('--warm').trim() || '#ea580c';
+  const grid = css.getPropertyValue('--chart-grid').trim() || 'rgba(0,0,0,0.08)';
   const text = css.getPropertyValue('--muted').trim() || '#64748b';
 
   if (data.length < 1) return;
@@ -640,13 +672,13 @@ function drawWeightChart() {
 
   // Ziel-Linie
   ctx.setLineDash([5, 5]);
-  ctx.strokeStyle = 'rgba(234,88,12,0.7)';
+  ctx.strokeStyle = warm;
   ctx.beginPath();
   ctx.moveTo(pad.l, y(target));
   ctx.lineTo(cssW - pad.r, y(target));
   ctx.stroke();
   ctx.setLineDash([]);
-  ctx.fillStyle = 'rgba(234,88,12,0.9)';
+  ctx.fillStyle = warm;
   ctx.fillText('Ziel ' + target, pad.l + 4, y(target) - 5);
 
   // Verlaufslinie
@@ -680,6 +712,171 @@ function computeStreak() {
     if (streak > 3650) break;
   }
   return streak;
+}
+
+/* ───────── Wochenstatistiken ───────── */
+
+function formatRange(keys) {
+  const a = parseYMD(keys[0]);
+  const b = parseYMD(keys[keys.length - 1]);
+  const sameMonth = a.getMonth() === b.getMonth();
+  const dd = (d) => d.toLocaleDateString('de-DE', { day: 'numeric' });
+  const ddm = (d) => d.toLocaleDateString('de-DE', { day: 'numeric', month: 'long' });
+  return `${sameMonth ? dd(a) + '.' : ddm(a)} – ${ddm(b)}`;
+}
+
+let _weekStats = null;
+
+function getWeekStats() {
+  const pl = currentPlan();
+  const anchor = addDays(ymd(), weekOffset * 7);
+  const keys = stats.rangeKeys(anchor, 7);
+  const s = stats.weeklyStats(state.days, keys, pl.targetCalories, pl.direction);
+  s.weightChange = stats.weightChangeInRange(state.weights, keys);
+  return s;
+}
+
+function weekMacroBar(label, val, goal, cls) {
+  const p = goal ? Math.min(100, Math.round((val / goal) * 100)) : 0;
+  return `<div class="macro"><div class="macro-top"><span>${label}</span><span>${fmt(val)} / ${fmt(goal)} g</span></div><div class="bar"><div class="bar-fill ${cls}" style="width:${p}%"></div></div></div>`;
+}
+
+function weekMessage(s) {
+  if (!s.daysLogged) return '📊 Noch keine Einträge in dieser Woche — leg los und sieh deinen Wochentrend wachsen!';
+  if (s.daysLogged >= 6 && s.daysOnPlan >= 5) return '🌟 Überragende Woche! Du bleibst super konstant — genau so erreichst du dein Ziel.';
+  if (s.daysOnPlan >= Math.ceil(s.daysLogged * 0.6)) return '👏 Starke Woche! Die meisten Tage lagen im Plan. Weiter dranbleiben!';
+  if (s.daysLogged >= 4) return '💪 Gut protokolliert! Achte nächste Woche auf ein paar Tage mehr im Plan — du schaffst das.';
+  return '🌱 Jeder Tag zählt. Trag fleißig ein, dann wird dein Wochenbild immer aussagekräftiger.';
+}
+
+function renderWeek() {
+  const pl = currentPlan();
+  const s = getWeekStats();
+  _weekStats = s;
+  const isCurrent = weekOffset === 0;
+  const rangeLabel = formatRange(s.keys);
+  const dirWord = pl.direction === 'gain' ? 'unter' : 'über';
+
+  return `
+    <div class="date-nav">
+      <button class="icon-btn" data-act="week" data-delta="-1" aria-label="Vorherige Woche">‹</button>
+      <div class="date-label">${isCurrent ? 'Diese Woche' : 'Woche'}</div>
+      <button class="icon-btn" data-act="week" data-delta="1" aria-label="Nächste Woche" ${isCurrent ? 'disabled' : ''}>›</button>
+    </div>
+
+    <div class="card">
+      <div class="muted small" style="text-align:center;margin-bottom:6px">${rangeLabel}</div>
+      <canvas id="week-chart" height="200"></canvas>
+      <div class="legend">
+        <span><span class="dot ok"></span> im Plan</span>
+        <span><span class="dot over"></span> ${dirWord} dem Ziel</span>
+        <span>┄ Ziel ${fmt(pl.targetCalories)} kcal</span>
+      </div>
+    </div>
+
+    <div class="week-summary">
+      <div class="card week-stat"><span class="v">${s.daysLogged ? fmt(s.avg.kcal) : '–'}</span><span class="l">Ø kcal / Tag</span></div>
+      <div class="card week-stat"><span class="v">${s.daysLogged}/7</span><span class="l">Tage protokolliert</span></div>
+      <div class="card week-stat"><span class="v">${s.daysOnPlan}/${s.daysLogged || 0}</span><span class="l">Tage im Plan</span></div>
+      <div class="card week-stat"><span class="v">${s.weightChange == null ? '–' : (s.weightChange > 0 ? '+' : '') + fmt(s.weightChange, 1) + ' kg'}</span><span class="l">Gewicht diese Woche</span></div>
+    </div>
+
+    <div class="card">
+      <h3 class="section-title flush">Ø Makros pro Tag</h3>
+      ${weekMacroBar('🥩 Eiweiß', s.avg.protein, pl.macros.protein, 'p')}
+      ${weekMacroBar('🍚 Kohlenhydrate', s.avg.carbs, pl.macros.carbs, 'c')}
+      ${weekMacroBar('🥑 Fett', s.avg.fat, pl.macros.fat, 'f')}
+    </div>
+
+    <div class="card eta-card">
+      <div>${weekMessage(s)}</div>
+    </div>
+  `;
+}
+
+function bindWeek() {
+  drawCurrentWeek();
+}
+
+function drawCurrentWeek() {
+  if (_weekStats) drawWeekChart(_weekStats);
+}
+
+function drawWeekChart(s) {
+  const canvas = document.getElementById('week-chart');
+  if (!canvas) return;
+  const dpr = window.devicePixelRatio || 1;
+  const cssW = canvas.clientWidth || canvas.parentElement.clientWidth - 32;
+  const cssH = 200;
+  canvas.width = cssW * dpr;
+  canvas.height = cssH * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, cssW, cssH);
+
+  const css = getComputedStyle(document.documentElement);
+  const accent = css.getPropertyValue('--accent').trim() || '#16a34a';
+  const warm = css.getPropertyValue('--warm').trim() || '#ea580c';
+  const grid = css.getPropertyValue('--chart-grid').trim() || 'rgba(0,0,0,0.08)';
+  const textCol = css.getPropertyValue('--muted').trim() || '#64748b';
+
+  const pad = { l: 34, r: 12, t: 12, b: 22 };
+  const w = cssW - pad.l - pad.r;
+  const h = cssH - pad.t - pad.b;
+  const max = (s.maxKcal || 1) * 1.1;
+  const y = (v) => pad.t + h - (v / max) * h;
+  const n = s.perDay.length;
+  const slot = w / n;
+  const bw = Math.min(34, slot * 0.6);
+
+  ctx.font = '10px system-ui, sans-serif';
+  ctx.strokeStyle = grid;
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const val = (max * i) / 4;
+    const yy = y(val);
+    ctx.beginPath();
+    ctx.moveTo(pad.l, yy);
+    ctx.lineTo(cssW - pad.r, yy);
+    ctx.stroke();
+    ctx.fillStyle = textCol;
+    ctx.fillText(String(Math.round(val)), 2, yy + 3);
+  }
+
+  s.perDay.forEach((d, i) => {
+    const cx = pad.l + slot * i + slot / 2;
+    const barH = d.kcal > 0 ? Math.max(2, (d.kcal / max) * h) : 0;
+    const x0 = cx - bw / 2;
+    const y0 = pad.t + h - barH;
+    const r = Math.min(5, bw / 2);
+    ctx.fillStyle = d.kcal === 0 ? grid : d.onPlan ? accent : warm;
+    ctx.beginPath();
+    ctx.moveTo(x0, pad.t + h);
+    ctx.lineTo(x0, y0 + r);
+    ctx.quadraticCurveTo(x0, y0, x0 + r, y0);
+    ctx.lineTo(x0 + bw - r, y0);
+    ctx.quadraticCurveTo(x0 + bw, y0, x0 + bw, y0 + r);
+    ctx.lineTo(x0 + bw, pad.t + h);
+    ctx.closePath();
+    ctx.fill();
+
+    const wd = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'][parseYMD(d.date).getDay()];
+    ctx.fillStyle = textCol;
+    ctx.textAlign = 'center';
+    ctx.fillText(wd, cx, cssH - 6);
+    ctx.textAlign = 'left';
+  });
+
+  if (s.target) {
+    ctx.setLineDash([5, 4]);
+    ctx.strokeStyle = warm;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(pad.l, y(s.target));
+    ctx.lineTo(cssW - pad.r, y(s.target));
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
 }
 
 /* ─────────────────────────── Essen hinzufügen (Modal) ─────────────────────────── */
@@ -743,8 +940,8 @@ function renderSearchTab() {
   return `
     <div class="search-bar">
       <input id="search-input" type="search" placeholder="Lebensmittel suchen … z. B. Haferflocken" autocomplete="off">
+      <div id="search-status" class="hint"></div>
     </div>
-    <div id="search-status" class="hint" style="display:none"></div>
     <div id="search-results"></div>
     <div id="quick-picks"></div>
   `;
@@ -771,6 +968,7 @@ function chip(food, kind, i) {
 }
 
 let lastResults = [];
+let searchSeq = 0;
 function onSearchInput(e) {
   const q = e.target.value.trim();
   clearTimeout(searchTimer);
@@ -779,29 +977,37 @@ function onSearchInput(e) {
   const picks = document.getElementById('quick-picks');
   if (q.length < 2) {
     results.innerHTML = '';
-    status.style.display = 'none';
+    status.textContent = '';
     if (picks) picks.style.display = '';
     return;
   }
   if (picks) picks.style.display = 'none';
-  // Sofort lokale Treffer zeigen.
+  // Sofort lokale Treffer zeigen (ohne Wartezeit).
   const local = searchLocal(q);
   lastResults = local;
   results.innerHTML = resultList(local);
-  status.style.display = '';
   status.textContent = 'Suche bei Open Food Facts …';
+  const seq = ++searchSeq;
   searchTimer = setTimeout(async () => {
+    let remote;
+    let failed = false;
     try {
-      const remote = await api.searchFoods(q);
-      // Lokale Treffer voranstellen, Duplikate grob vermeiden.
-      const merged = [...local, ...remote];
-      lastResults = merged;
-      results.innerHTML = resultList(merged);
-      status.style.display = merged.length ? 'none' : '';
-      if (!merged.length) status.textContent = 'Nichts gefunden. Versuch’s mit „Manuell“. ✏️';
+      remote = await api.searchFoods(q);
     } catch (err) {
-      status.textContent = '⚠️ Online-Suche nicht erreichbar. Lokale Treffer & „Manuell“ stehen bereit.';
+      failed = true;
     }
+    if (seq !== searchSeq) return; // veraltete Antwort einer früheren Eingabe verwerfen
+    if (failed) {
+      // Nur bei echtem Netzwerk-/Serverfehler.
+      status.textContent = local.length
+        ? '⚠️ Online-Suche gerade nicht erreichbar — lokale Treffer werden angezeigt.'
+        : '⚠️ Online-Suche gerade nicht erreichbar. Versuch’s gleich erneut oder nutze „Manuell“. ✏️';
+      return;
+    }
+    const merged = [...local, ...remote];
+    lastResults = merged;
+    results.innerHTML = resultList(merged);
+    status.textContent = merged.length ? '' : `Keine Treffer für „${esc(q)}“ gefunden — versuch’s mit „Manuell“. ✏️`;
   }, 450);
 }
 
@@ -1129,6 +1335,14 @@ function setupGlobalEvents() {
         if (selectedDate > ymd()) selectedDate = ymd();
         render();
         break;
+      case 'week':
+        weekOffset += Number(btn.dataset.delta);
+        if (weekOffset > 0) weekOffset = 0;
+        render();
+        break;
+      case 'toggle-theme':
+        toggleTheme();
+        break;
       case 'del-entry': {
         const { meal, id } = btn.dataset;
         const day = getDay(selectedDate);
@@ -1209,17 +1423,31 @@ function setupGlobalEvents() {
     if (e.key === 'Escape') closeModal();
   });
 
-  // Chart bei Größenänderung neu zeichnen.
+  // Charts bei Größenänderung neu zeichnen.
   let rz;
   window.addEventListener('resize', () => {
     clearTimeout(rz);
     rz = setTimeout(() => {
-      if (view === 'progress' && state.profile) drawWeightChart();
+      if (!state.profile) return;
+      if (view === 'progress') drawWeightChart();
+      if (view === 'week') drawCurrentWeek();
     }, 150);
   });
+
+  // Auf Systemwechsel hell/dunkel reagieren, solange kein manuelles Theme gesetzt ist.
+  if (window.matchMedia) {
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+      const t = state.settings && state.settings.theme;
+      if (t !== 'light' && t !== 'dark') {
+        applyTheme();
+        renderTopbar();
+      }
+    });
+  }
 }
 
 /* ─────────────────────────── Start ─────────────────────────── */
 
+applyTheme();
 setupGlobalEvents();
 render();

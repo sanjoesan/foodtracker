@@ -63,12 +63,20 @@ export function normalize(p) {
   };
 }
 
-async function fetchJSON(url, { timeout = 12000 } = {}) {
+async function fetchJSON(url, { timeout = 12000, tolerantParse = false } = {}) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeout);
   try {
     const res = await fetch(url, { signal: ctrl.signal, headers: { Accept: 'application/json' } });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`); // echter Serverfehler
+    if (tolerantParse) {
+      // Unverständliche Antwort → null (= "keine Treffer"), kein harter Fehler.
+      try {
+        return await res.json();
+      } catch {
+        return null;
+      }
+    }
     return await res.json();
   } finally {
     clearTimeout(t);
@@ -107,8 +115,10 @@ export async function searchFoods(query, { pageSize = 24 } = {}) {
     fields: FIELDS,
   });
   const url = `${BASE}/cgi/search.pl?${params.toString()}`;
-  const data = await fetchJSON(url, { timeout: 15000 });
-  const products = (data && data.products) || [];
+  // tolerantParse: leere/seltsame Antworten gelten als "keine Treffer",
+  // nur echte Netzwerk-/Serverfehler werfen (→ UI: "nicht erreichbar").
+  const data = await fetchJSON(url, { timeout: 15000, tolerantParse: true });
+  const products = data && Array.isArray(data.products) ? data.products : [];
   return products
     .map(normalize)
     .filter((f) => f && f.kcal > 0) // nur Treffer mit echten Nährwerten

@@ -6,7 +6,10 @@
   "private": true,
   "scripts": {
     "test": "node --test",
-    "check": "node --check js/app.js && node --check js/calc.js && node --check js/api.js && node --check js/scanner.js && node --check js/storage.js && node --check js/db.js"
+    "check": "node --check js/app.js && node --check js/calc.js && node --check js/api.js && node --check js/scanner.js && node --check js/storage.js && node --check js/db.js && node --check js/stats.js"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "jsdom": "^29.1.1"
+  }
 }
