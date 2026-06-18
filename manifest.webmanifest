@@ -1,0 +1,19 @@
+{
+  "name": "Foodtracker",
+  "short_name": "Foodtracker",
+  "description": "Gesund & motiviert zum Ziel: Kalorien und Makros tracken, Barcode scannen.",
+  "lang": "de",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f6f8f5",
+  "theme_color": "#16a34a",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

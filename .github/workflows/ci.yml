@@ -1,0 +1,24 @@
+name: CI – Qualitätssicherung
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Node einrichten
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Syntax-Check (alle Module)
+        run: npm run check
+
+      - name: Tests (Berechnungslogik)
+        run: npm test

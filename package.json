@@ -1,0 +1,12 @@
+{
+  "name": "foodtracker",
+  "version": "1.0.0",
+  "description": "Freundlicher, motivierender Foodtracker: Kalorien & Makros tracken, Barcode scannen, Ziel mit gesundem Tempo erreichen. Vanilla JS, läuft auf GitHub Pages.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check js/app.js && node --check js/calc.js && node --check js/api.js && node --check js/scanner.js && node --check js/storage.js && node --check js/db.js"
+  },
+  "license": "MIT"
+}
