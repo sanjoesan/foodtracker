@@ -56,6 +56,17 @@ test('Canvas-Diagramme sind auf 100 % begrenzt', () => {
   assert.match(ruleBody('canvas {'), /max-width:\s*100%/);
 });
 
+test('Hinzufügen-Sheet hat stabile Höhe (springt beim Tippen/Tabwechsel nicht)', () => {
+  // Feste Höhe am Container → bodenverankertes Sheet bewegt die Oberkante nicht.
+  assert.match(ruleBody('.sheet {'), /height:\s*min\(/);
+  // Innerer Bereich scrollt statt das ganze Sheet zu vergrößern.
+  const body = ruleBody('.sheet-body {');
+  assert.match(body, /flex:\s*1/);
+  assert.match(body, /overflow-y:\s*auto/);
+  // Der statische Portionsdialog darf weiterhin an den Inhalt angepasst sein.
+  assert.match(ruleBody('.sheet.portion {'), /height:\s*auto/);
+});
+
 test('Dark-Mode-Variablen sind definiert', () => {
   assert.ok(css.includes('[data-theme="dark"]'), 'Dark-Theme-Block fehlt');
   const body = ruleBody(':root[data-theme="dark"]');

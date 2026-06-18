@@ -69,10 +69,22 @@ test('Foodtracker-Nutzerfluss', async (t) => {
     assert.ok(document.getElementById('tabbar').innerHTML.includes('Woche'));
   });
 
-  await t.test('Essen über Schnellauswahl hinzufügen', async () => {
+  await t.test('Add-Sheet: alle Tabs (Manuell/Scan/Text) funktionieren', async () => {
     click('[data-act="quick-add"]');
     await sleep(10);
-    assert.ok(modal().includes('Häufige Lebensmittel'));
+    assert.ok(modal().includes('Hinzufügen zu'), 'Add-Sheet offen');
+    click('[data-act="add-tab"][data-tab="manual"]');
+    await sleep(5);
+    assert.ok(modal().includes('Als eigenes Lebensmittel speichern'), 'Manuell-Tab');
+    click('[data-act="add-tab"][data-tab="scan"]');
+    await sleep(5);
+    assert.ok(/Barcode|Kamera/.test(modal()), 'Scan-Tab');
+    click('[data-act="add-tab"][data-tab="search"]');
+    await sleep(5);
+    assert.ok(modal().includes('Häufige Lebensmittel'), 'Suche-Tab mit Schnellauswahl');
+  });
+
+  await t.test('Essen über Schnellauswahl hinzufügen', async () => {
     click('[data-act="pick"][data-kind="common"][data-i="0"]');
     await sleep(10);
     assert.ok(modal().includes('Eintragen'));

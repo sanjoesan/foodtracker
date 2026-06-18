@@ -875,12 +875,19 @@ canvas {
   background: var(--card);
   width: 100%;
   max-width: var(--maxw);
+  /* Stabile Höhe: verhindert, dass das bodenverankerte Sheet beim Ändern
+     des Inhalts (Treffer, Tabwechsel) nach oben/unten springt. */
+  height: min(88vh, 700px);
   max-height: 92vh;
   border-radius: 22px 22px 0 0;
   display: flex;
   flex-direction: column;
   box-shadow: var(--shadow-lg);
   animation: slideup 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+/* Der kurze Portionsdialog hat festen, statischen Inhalt → an Inhalt anpassen. */
+.sheet.portion {
+  height: auto;
 }
 @keyframes slideup {
   from {
@@ -916,7 +923,10 @@ canvas {
 }
 .sheet-body {
   padding: 16px;
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
   overflow-y: auto;
+  flex: 1; /* füllt die fixe Sheet-Höhe; Inhalt scrollt hier, nicht das ganze Sheet */
+  min-height: 0;
 }
 .tabs {
   display: flex;
